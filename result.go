@@ -8,6 +8,15 @@ import (
 type isOk bool
 type isErr bool
 
+// Result is a container type that holds a value of type T or an error.
+// It cannot simultaneously hold a non-nil value and a non-nil error.
+//
+// However, it can hold both a valid value and a valid error at the same time.
+//
+// Nevertheless, when working with Result, if it holds both an error and a value,
+// it will always return a nil pointer as the value.
+// In such cases, for example, calling Value() will return a nil pointer,
+// and calling Match() will always return result.Err().
 type Result[T any] struct {
 	value   T
 	err     error
@@ -17,15 +26,15 @@ type Result[T any] struct {
 // New returns a new instance of the Result[T] type, where T is
 // the inherited type of value.
 //
-// If a non-nil rError was passed as an argument, Result.Error() will return
-// the provided error, and Result.Value() will contain a nil pointer.
+// If a non-nil rError was passed as an argument, Error() will return
+// the provided error, and Value() will contain a nil pointer.
 //
-// Otherwise, Result.Value() will return the valid value passed earlier,
-// and Result.Error() will return nil instead of an error.
+// Otherwise, Value() will return the valid value passed earlier,
+// and Error() will return nil instead of an error.
 //
-// The discriminated union nature of T | error is simulated using the Result.Match() method,
-// which allows matching the current Result[T] with Result.Ok() in case of no error,
-// as well as with Result.Err() in case of an error.
+// The discriminated union nature of T | error is simulated using the Match() method,
+// which allows matching the current Result[T] with result.Ok() in case of no error,
+// as well as with result.Err() in case of an error.
 func New[T any](value T, rError error) Result[T] {
 	if rError != nil {
 		return err[T](rError)
@@ -61,19 +70,19 @@ func (r Result[T]) Error() error {
 	return r.err
 }
 
-// Ok returns the type to match with Result.Match() for valid cases.
+// Ok returns the type to match with Match() for valid cases.
 func Ok() reflect.Type {
 	return reflect.TypeOf(new(isOk))
 }
 
-// Err returns the type to match with Result.Match() for invalid cases.
+// Err returns the type to match with Match() for invalid cases.
 func Err() reflect.Type {
 	return reflect.TypeOf(new(isErr))
 }
 
 // Unwrap allows obtaining the nested value and error inside the Result as a (T, error) return signature.
 //
-// It is recommended to use the Result.Match() method for proper pattern matching.
+// It is recommended to use the Match() method for proper pattern matching.
 //
 // If an error is present, attempting to work with T may panic.
 // If T is present, attempting to work with the error may panic.
