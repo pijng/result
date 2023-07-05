@@ -1,7 +1,6 @@
 package result
 
 import (
-	"fmt"
 	"reflect"
 )
 
@@ -18,7 +17,7 @@ type isErr bool
 // In such cases, for example, calling Value() will return a nil pointer,
 // and calling Match() will always return result.Err().
 type Result[T any] struct {
-	value   T
+	value   *T
 	err     error
 	variant interface{}
 }
@@ -62,7 +61,11 @@ func (r Result[T]) Match() reflect.Type {
 
 // Value returns the underlying value of the Result with type T.
 func (r Result[T]) Value() T {
-	return r.value
+	if r.value == nil {
+		return *new(T)
+	}
+
+	return *r.value
 }
 
 // Error returns the underlying error of the Result.
@@ -91,23 +94,9 @@ func (r Result[T]) Unwrap() (T, error) {
 }
 
 func ok[T any](value T) Result[T] {
-	return Result[T]{value: value, variant: new(isOk)}
+	return Result[T]{value: &value, variant: new(isOk)}
 }
 
 func err[T any](err error) Result[T] {
 	return Result[T]{err: err, variant: new(isErr)}
-}
-
-func test() {
-	v := 1
-	x := New(v, nil)
-
-	switch x.Match() {
-	case Ok():
-		fmt.Println("there is value:")
-		fmt.Println(x.Value())
-	case Err():
-		fmt.Println("there is error:")
-		fmt.Println(x.Error())
-	}
 }
