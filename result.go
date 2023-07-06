@@ -121,8 +121,8 @@ func (r Result[T]) IsOkAnd(f func(T) bool) bool {
 	return f(r.Value())
 }
 
-func Map[T, V any](r Result[T], f mFunc[T, V]) Result[V] {
-	return New[V](f(r.Value()), r.Error())
+func Map[T, U any](r Result[T], f mFunc[T, U]) Result[U] {
+	return New[U](f(r.Value()), r.Error())
 }
 
 func (r Result[T]) MapErr(f func(error) error) Result[T] {
