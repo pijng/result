@@ -1,6 +1,8 @@
 package result
 
 import (
+	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -73,6 +75,81 @@ func (r Result[T]) Error() error {
 	return r.err
 }
 
+func (r Result[T]) And(newR Result[T]) Result[T] {
+	if r.err != nil {
+		return err[T](r.err)
+	}
+
+	if newR.err != nil {
+		return err[T](newR.err)
+	}
+
+	return ok[T](newR.Value())
+}
+
+func (r Result[T]) AndThen(f func(T) Result[T]) Result[T] {
+	if r.err != nil {
+		return err[T](r.err)
+	}
+
+	return f(r.Value())
+}
+
+func (r Result[T]) Expect(rErr error) Result[T] {
+	if r.err != nil {
+		return err[T](fmt.Errorf("%w: %w", rErr, r.err))
+	}
+
+	return r
+}
+
+func (r Result[T]) IsErr() bool {
+	return r.Error() != nil
+}
+
+func (r Result[T]) IsErrAnd(rErr error) bool {
+	return errors.Is(r.Error(), rErr)
+}
+
+func (r Result[T]) IsOk() bool {
+	return r.Error() == nil
+}
+
+func (r Result[T]) IsOkAnd(f func(T) bool) bool {
+	return f(r.Value())
+}
+
+func (r Result[T]) Map(f func(T) T) Result[T] {
+	return New(f(r.Value()), r.Error())
+}
+
+func (r Result[T]) MapErr(f func(error) error) Result[T] {
+	return New(r.Value(), f(r.Error()))
+}
+
+func (r Result[T]) MapOr(v T, f func(T) T) T {
+	if r.Error() != nil {
+		return v
+	}
+
+	return f(r.Value())
+}
+
+func (r Result[T]) MapOrElse(eF func(error) T, oF func(T) T) T {
+	if r.Error() != nil {
+		return eF(r.Error())
+	}
+
+	return oF(r.Value())
+}
+
+// Unwrap allows obtaining the nested value and error inside the Result as a (T, error) return signature.
+//
+// It is recommended to use the Match() method for proper pattern matching.
+func (r Result[T]) Unwrap() (T, error) {
+	return r.Value(), r.Error()
+}
+
 // Ok returns the type to match with Match() for valid cases.
 func Ok() reflect.Type {
 	return reflect.TypeOf(new(isOk))
@@ -81,16 +158,6 @@ func Ok() reflect.Type {
 // Err returns the type to match with Match() for invalid cases.
 func Err() reflect.Type {
 	return reflect.TypeOf(new(isErr))
-}
-
-// Unwrap allows obtaining the nested value and error inside the Result as a (T, error) return signature.
-//
-// It is recommended to use the Match() method for proper pattern matching.
-//
-// If an error is present, attempting to work with T may panic.
-// If T is present, attempting to work with the error may panic.
-func (r Result[T]) Unwrap() (T, error) {
-	return r.Value(), r.Error()
 }
 
 func ok[T any](value T) Result[T] {
