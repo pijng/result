@@ -9,6 +9,8 @@ import (
 type isOk bool
 type isErr bool
 
+type mFunc[T any, U any] func(T) U
+
 // Result is a container type that holds a value of type T or an error.
 // It cannot simultaneously hold a non-nil value and a non-nil error.
 //
@@ -119,8 +121,8 @@ func (r Result[T]) IsOkAnd(f func(T) bool) bool {
 	return f(r.Value())
 }
 
-func (r Result[T]) Map(f func(T) T) Result[T] {
-	return New(f(r.Value()), r.Error())
+func Map[T, V any](r Result[T], f mFunc[T, V]) Result[V] {
+	return New[V](f(r.Value()), r.Error())
 }
 
 func (r Result[T]) MapErr(f func(error) error) Result[T] {
