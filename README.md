@@ -14,7 +14,7 @@ go get github.com/pijng/result
 
 ## Usage/Examples
 
-#### Creating a new `Return` object and returning it as the function's result:
+#### Creating a new `Result` object and returning it as the function's result:
 
 ```go
 type User struct {
