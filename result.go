@@ -14,11 +14,9 @@ type mFunc[T any, U any] func(T) U
 // Result is a container type that holds a value of type T or an error.
 // It cannot simultaneously hold a non-nil value and a non-nil error.
 //
-// However, it can hold both a valid value and a valid error at the same time.
-//
 // Nevertheless, when working with Result, if it holds both an error and a value,
-// it will always return a nil pointer as the value.
-// In such cases, for example, calling Value() will return a nil pointer,
+// it will always return a nil value of type T.
+// In such cases, for example, calling Value() will return a nil value of type T,
 // and calling Match() will always return result.Err().
 type Result[T any] struct {
 	value   *T
@@ -30,7 +28,7 @@ type Result[T any] struct {
 // the inherited type of value.
 //
 // If a non-nil rError was passed as an argument, Error() will return
-// the provided error, and Value() will contain a nil pointer.
+// the provided error, and Value() will return a nil value value of type T.
 //
 // Otherwise, Value() will return the valid value passed earlier,
 // and Error() will return nil instead of an error.
@@ -64,7 +62,7 @@ func (r Result[T]) Match() reflect.Type {
 	return reflect.TypeOf(r.variant)
 }
 
-// Value returns the underlying value of the Result with type T.
+// Value returns the underlying value of type T.
 func (r Result[T]) Value() T {
 	if r.value == nil {
 		return *new(T)
@@ -73,7 +71,7 @@ func (r Result[T]) Value() T {
 	return *r.value
 }
 
-// Error returns the underlying error of the Result.
+// Error returns the underlying error.
 func (r Result[T]) Error() error {
 	return r.err
 }
@@ -149,7 +147,7 @@ func Map[T, U any](r Result[T], f mFunc[T, U]) Result[U] {
 }
 
 // MapErr returns result of f function with Result error as an argument
-// if Result has and error.
+// if Result has an error.
 //
 // Otherwise returns self.
 func (r Result[T]) MapErr(f func(error) error) Result[T] {
