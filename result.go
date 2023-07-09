@@ -17,69 +17,46 @@ type Result[T any, E any] struct {
 
 // C is an optional config struct used to create a new Result.
 type C struct {
-	// Strict allows you to deny access to a Result value without using
-	// the Error() method first.
-	//
-	// Calling Value() or Unwrap() on Result will panic whether there is
-	// and error or not.
+	// Strict allows you to panic when calling Unwrap() on Result.
 	Strict bool
 }
 
-// Ok returns a new instance of Result[T] that holds a value, where T is
+// Ok returns a new instance of Result[T, E] that holds a value, where T is
 // the inherited type of value.
 //
-// Calling Match() on such a Result will always match result.IsOk()
+// Calling Match() on such a Result will always call an okF function.
 func Ok[T any](value T, config ...C) Result[T, T] {
 	return ok[T, T](value, config...)
 }
 
-// Err returns a new instance of Result[T] that holds an error, where T is
-// the inherited type of zero value.
+// Err returns a new instance of Result[T, E] that holds an error, where T is
+// the inherited type of error.
 //
-// Calling Match() on such a Result will always match result.IsErr()
+// Calling Match() on such a Result will always call an errF function.
 func Err[E any](rErr E, config ...C) Result[E, E] {
 	return err[E, E](rErr, config...)
 }
 
-// newResult returns an instance of the Result[T], where T is
+// newResult returns an instance of the Result[T, E], where T is
 // the inherited type of value.
-//
-// If a non-nil rError was passed as an argument, Error() will return
-// the provided error, and Value() will return a zero value of type T.
-//
-// Otherwise, Value() will return the valid value passed earlier,
-// and Error() will return nil instead of an error.
-//
-// The discriminated union nature of T | error is simulated using the Match() method,
-// which allows matching the current Result[T] with result.IsOk() in case of no error,
-// as well as with result.IsErr() in case of an error.
 func newResult[T, E any](value T, rError E, config ...C) Result[T, E] {
-	var isStrict bool
-
-	if len(config) > 0 {
-		isStrict = config[0].Strict
-	}
-
-	return Result[T, E]{value: &value, err: &rError, strict: isStrict}
+	return Result[T, E]{value: &value, err: &rError, strict: extractStrict(config...)}
 }
 
 // Match simulates pattern matching for handling scenarios of having a valid result
 // or having an error.
 // It is used in the following format:
 //
-//	v := 1
-//	r := result.New(1, nil)
+//	userId := result.Ok(1337)
 //
-//	switch r.Match() {
-//	case result.IsOk():
-//		fmt.Println("there is a value:")
-//		fmt.Println(x.Value())
-//	case result.IsErr():
-//		fmt.Println("there is an error:")
-//		fmt.Println(x.Error())
-//	}
+//	res := result.Match(userId,
+//		func(v int) int { return v * 2 },
+//		func(err int) int { return err * 0 },
+//	)
+//
+//	fmt.Println(res)
 func Match[T, E any, U any](r Result[T, E], okF func(T) U, errF func(E) U) U {
-	if r.err != nil {
+	if r.isErr() {
 		return errF(r.innerError())
 	}
 
@@ -91,12 +68,15 @@ func (r Result[T, E]) innerValue() T {
 }
 
 func (r Result[T, E]) innerError() E {
-	// if r.err != nil {
-	// 	return *r.err
-	// }
-
-	// return *new(E)
 	return *r.err
+}
+
+func (r Result[T, E]) isErr() bool {
+	return r.err != nil
+}
+
+func (r Result[T, E]) isOk() bool {
+	return r.isOk()
 }
 
 // And returns a passed newR if the Result has no error and newR has no error.
@@ -104,11 +84,11 @@ func (r Result[T, E]) innerError() E {
 // Otherwise returns a Result with a contained error, if present,
 // or a new Result with error from newR.
 func (r Result[T, E]) And(newR Result[T, E]) Result[T, E] {
-	if r.err != nil {
+	if r.isErr() {
 		return err[T, E](r.innerError())
 	}
 
-	if newR.err != nil {
+	if newR.isErr() {
 		return err[T, E](newR.innerError())
 	}
 
@@ -120,7 +100,7 @@ func (r Result[T, E]) And(newR Result[T, E]) Result[T, E] {
 //
 // Otherwise returns a Result with a contained error.
 func (r Result[T, E]) AndThen(f func(T) Result[T, E]) Result[T, E] {
-	if r.err != nil {
+	if r.isErr() {
 		return err[T, E](r.innerError())
 	}
 
@@ -129,27 +109,27 @@ func (r Result[T, E]) AndThen(f func(T) Result[T, E]) Result[T, E] {
 
 // IsErr returns true if Result has an error.
 func (r Result[T, E]) IsErr() bool {
-	return r.err != nil
+	return r.isErr()
 }
 
 // IsErrAnd returns true if rErr matches the contained Result error.
-func (r Result[T, E]) IsErrAnd(rErr E) bool {
-	if r.err == nil {
+func (r Result[T, E]) IsErrAnd(f func(E) bool) bool {
+	if r.isOk() {
 		return false
 	}
 
-	return r.err == &rErr
+	return f(r.innerError())
 }
 
 // IsOk returns true if Result has no error.
 func (r Result[T, E]) IsOk() bool {
-	return r.err == nil
+	return r.isOk()
 }
 
 // IsOkAnd returns true if Result has no error and the contained value
 // matches a predicate of f.
 func (r Result[T, E]) IsOkAnd(f func(T) bool) bool {
-	if r.err != nil {
+	if r.isErr() {
 		return false
 	}
 
@@ -169,7 +149,7 @@ func Map[T, E, U any](r Result[T, E], okF mFunc[T, U]) Result[U, E] {
 //
 // Otherwise returns self.
 func (r Result[T, E]) MapErr(errF func(E) E) Result[T, E] {
-	if r.err == nil {
+	if r.isOk() {
 		return r
 	}
 
@@ -181,7 +161,7 @@ func (r Result[T, E]) MapErr(errF func(E) E) Result[T, E] {
 // MapOr returns the provided rDefault of type T if Result has an error, otherwise
 // returns a result of f function with Result value as an argument.
 func (r Result[T, E]) MapOr(rDefault T, f func(T) T) T {
-	if r.err != nil {
+	if r.isErr() {
 		return rDefault
 	}
 
@@ -191,7 +171,7 @@ func (r Result[T, E]) MapOr(rDefault T, f func(T) T) T {
 // MapOrElse calls an errF function with Result error as an argument if Result
 // has an error, otherwise calls an okF function with a Result value as an argument.
 func (r Result[T, E]) MapOrElse(errF func(E) T, okF func(T) T) T {
-	if r.err != nil {
+	if r.isErr() {
 		return errF(r.innerError())
 	}
 
@@ -212,15 +192,15 @@ func (r Result[T, E]) Unwrap() (T, E) {
 }
 
 func (r Result[T, E]) UnwrapOr(rDefault T) T {
-	if r.err != nil {
-		return rDefault
+	if r.isOk() {
+		return r.innerValue()
 	}
 
-	return r.innerValue()
+	return rDefault
 }
 
 func (r Result[T, E]) UnwrapOrElse(f func(E) T) T {
-	if r.err == nil {
+	if r.isOk() {
 		return r.innerValue()
 	}
 
@@ -233,21 +213,17 @@ func (r Result[T, E]) IsStrict() bool {
 }
 
 func ok[T, E any](value T, config ...C) Result[T, E] {
-	var isStrict bool
-
-	if len(config) > 0 {
-		isStrict = config[0].Strict
-	}
-
-	return Result[T, E]{value: &value, strict: isStrict}
+	return Result[T, E]{value: &value, strict: extractStrict(config...)}
 }
 
 func err[T, E any](err E, config ...C) Result[T, E] {
-	var isStrict bool
+	return Result[T, E]{err: &err, strict: extractStrict(config...)}
+}
 
+func extractStrict(config ...C) bool {
 	if len(config) > 0 {
-		isStrict = config[0].Strict
+		return config[0].Strict
 	}
 
-	return Result[T, E]{err: &err, strict: isStrict}
+	return false
 }
