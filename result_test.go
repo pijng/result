@@ -1,6 +1,7 @@
 package result
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,61 +10,54 @@ import (
 func TestNew(t *testing.T) {
 	type args struct {
 		value  int
-		rError int
-		c      C
+		rError error
 	}
 	tests := []struct {
 		name      string
 		args      args
 		wantValue int
-		wantError int
+		wantError error
 		wantPanic bool
 	}{
 		{
 			name:      "Result with value and empty error",
-			args:      args{value: 1, rError: *new(int)},
+			args:      args{value: 1, rError: nil},
 			wantValue: 1,
-			wantError: *new(int),
+			wantError: nil,
 			wantPanic: false,
 		},
 		{
 			name:      "Result with error and empty value",
-			args:      args{value: *new(int), rError: *new(int)},
+			args:      args{value: *new(int), rError: fmt.Errorf("error")},
 			wantValue: *new(int),
-			wantError: *new(int),
+			wantError: fmt.Errorf("error"),
 			wantPanic: false,
 		},
 		{
 			name:      "Result with error and value",
-			args:      args{value: 1, rError: 1},
+			args:      args{value: 1, rError: fmt.Errorf("error")},
 			wantValue: 1,
-			wantError: 1,
+			wantError: fmt.Errorf("error"),
 			wantPanic: false,
 		},
 		{
 			name:      "Result with empty error and empty value",
-			args:      args{value: *new(int), rError: *new(int)},
+			args:      args{value: *new(int), rError: fmt.Errorf("error")},
 			wantValue: *new(int),
-			wantError: *new(int),
+			wantError: fmt.Errorf("error"),
 			wantPanic: false,
 		},
 		{
 			name:      "Result with strict config",
-			args:      args{value: 1, rError: 1, c: C{Strict: true}},
+			args:      args{value: 1, rError: fmt.Errorf("error")},
 			wantValue: 1,
-			wantError: 1,
+			wantError: fmt.Errorf("error"),
 			wantPanic: true,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer func() { recover() }()
-
-			got := newResult(tt.args.value, tt.args.rError, tt.args.c)
-
-			if tt.wantPanic {
-				assert.Panics(t, func() { got.Unwrap() })
-			}
+			got := newResult(tt.args.value, tt.args.rError)
 
 			value, err := got.Unwrap()
 			assert.Equal(t, tt.wantValue, value)
