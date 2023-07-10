@@ -149,7 +149,7 @@ func Map[T, U any](r Result[T, any], okF mFunc[T, U]) Result[U, any] {
 	return newResult(computedValue, r.innerError())
 }
 
-func Expand[T, U any](r Result[T, any]) Result[T, U] {
+func Expand[U, T any](r Result[T, any]) Result[T, U] {
 	value := r.innerValue()
 
 	return Result[T, U]{value: &value, err: r.innerError()}
